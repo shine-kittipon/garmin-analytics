@@ -24,5 +24,18 @@
     "rows_hrv":1,
     "rows_training":3,
     "source":"garminconnect"
+  },
+  {
+    "id":3,
+    "ran_at_utc":"2026-06-28T05:19:06+00:00",
+    "range_start":"2026-06-26",
+    "range_end":"2026-06-28",
+    "rows_activities":0,
+    "rows_laps":0,
+    "rows_daily":0,
+    "rows_sleep":3,
+    "rows_hrv":1,
+    "rows_training":3,
+    "source":"garminconnect"
   }
 ]
