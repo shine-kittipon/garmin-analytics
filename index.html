@@ -57,6 +57,11 @@
   .empty{color:var(--dim);font-size:13px;padding:24px;text-align:center;line-height:1.7}
   .foot{text-align:center;color:var(--dim);font-size:11px;margin:16px 0;font-family:monospace}
 
+  .llm-bar{display:flex;justify-content:flex-end;margin:0 0 10px}
+  #copy-llm-btn{background:var(--panel2);color:var(--dim);border:1px solid var(--line);
+    border-radius:8px;padding:7px 14px;font-size:12px;cursor:pointer;transition:color .15s,border-color .15s}
+  #copy-llm-btn:hover{color:var(--text);border-color:var(--blue)}
+
   .agrid{display:flex;flex-wrap:wrap;gap:14px}
   .agrid > div{min-width:90px}
   .agrid .k{color:var(--dim);font-size:10px;text-transform:uppercase}
@@ -85,6 +90,10 @@
     <div class="item"><div class="k">ระยะรวม (วิ่ง)</div><div class="v em" id="sb-km">—</div></div>
     <div class="item"><div class="k">10K โดยประมาณ</div><div class="v" id="sb-est">—</div></div>
     <div class="item"><div class="k">สถานะ Sub-60</div><div class="v" id="sb-status">—</div></div>
+  </div>
+
+  <div class="llm-bar">
+    <button id="copy-llm-btn" onclick="copyForLLM()">📋 คัดลอกสำหรับ AI</button>
   </div>
 
   <div class="tabs">
@@ -590,6 +599,60 @@ function setTab(t){
     document.getElementById("view-"+id).style.display=t===id?"block":"none";
     document.getElementById("tab-"+id).classList.toggle("on",t===id);
   });
+}
+
+// ── copy for LLM ─────────────────────────────────────────────────────────────
+async function copyForLLM(){
+  const btn=document.getElementById("copy-llm-btn");
+  const orig=btn.textContent;
+  btn.textContent="กำลังคัดลอก…";
+  try{
+    const coachRes=await fetch("coach/prompts/coach.md?t="+Date.now());
+    const coachPrompt=coachRes.ok ? await coachRes.text() : "(coach prompt unavailable)";
+
+    const today=new Date().toISOString().slice(0,10);
+
+    // Derive GitHub repo URL from GitHub Pages hostname (<user>.github.io/<repo>)
+    let repoUrl="";
+    const h=window.location.hostname;
+    if(h.endsWith(".github.io")){
+      const user=h.replace(".github.io","");
+      const repo=window.location.pathname.split("/").filter(Boolean)[0]||"";
+      if(repo) repoUrl=`https://github.com/${user}/${repo}`;
+    }
+    const repoLine=repoUrl||"https://github.com/<username>/garmin-analytics";
+
+    const sections=[
+      coachPrompt,
+      "",
+      "---",
+      "",
+      `# Athlete Data (as of ${today})`,
+      "",
+      `GitHub repo: ${repoLine}`,
+      "",
+      "Please load and analyse the following data files from the repo:",
+      "",
+      "- `data/json/activities.json` — all recorded activities (runs, etc.)",
+      "- `data/json/sleep.json` — nightly sleep scores and stages",
+      "- `data/json/hrv.json` — heart rate variability (last night avg)",
+      "- `data/json/daily_summary.json` — resting HR, body battery, stress",
+      "- `data/json/training.json` — VO2max, training status, acute/chronic load",
+    ].join("\n");
+
+    await navigator.clipboard.writeText(sections);
+    btn.textContent="คัดลอกแล้ว ✓";
+    btn.style.color="var(--accent)";
+    btn.style.borderColor="var(--accent)";
+    setTimeout(()=>{
+      btn.textContent=orig;
+      btn.style.color="";
+      btn.style.borderColor="";
+    },2500);
+  }catch(e){
+    btn.textContent="ผิดพลาด: "+e.message;
+    setTimeout(()=>{ btn.textContent=orig; },3000);
+  }
 }
 
 load();
