@@ -70,8 +70,8 @@ In your repo: Settings → Secrets and variables → Actions → New repository 
 
 | Secret | Value |
 |---|---|
-| `GARMIN_TOKEN` | output of `c.garth.dumps()` above |
-| `ANTHROPIC_API_KEY` | your Anthropic API key (for weekly reports) |
+| `GARMIN_TOKEN` | output of `get_token.py` |
+| `GOOGLE_API_KEY` | your Google AI Studio API key (for weekly reports) |
 
 `GARMIN_EMAIL` + `GARMIN_PASSWORD` are optional fallbacks if you don't use MFA.
 

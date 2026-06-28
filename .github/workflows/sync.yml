@@ -27,7 +27,7 @@ jobs:
           cache: pip
 
       - name: Install dependencies
-        run: pip install garminconnect garth pandas anthropic mcp
+        run: pip install garminconnect garth pandas google-generativeai mcp
 
       - name: Pull Garmin data
         env:
@@ -41,7 +41,7 @@ jobs:
         # Only runs on the scheduled cron, not manual dispatch
         if: github.event_name == 'schedule'
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
         run: |
           # date +%u returns 1 for Monday
           if [ "$(date +%u)" = "1" ]; then

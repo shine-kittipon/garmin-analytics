@@ -1,8 +1,8 @@
 """
-report.py — Generate a weekly coaching report via the Anthropic API.
+report.py — Generate a weekly coaching report via Google Gemini (AI Studio).
 
 Reads the current database via features.py, builds the CoachSummary,
-and asks Claude to produce a structured markdown coaching report.
+and asks Gemini to produce a structured markdown coaching report.
 The report is written to data/reports/weekly-YYYY-Www.md and committed
 by the GitHub Actions workflow every Monday.
 
@@ -14,24 +14,23 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from datetime import date
 from pathlib import Path
 
-import anthropic
+import google.generativeai as genai
 
 from .features import summary_as_dict
 
 PROMPTS_DIR = Path(__file__).parent / "prompts"
 REPORTS_DIR = Path(__file__).parents[1] / "data" / "reports"
 
-# claude-sonnet-4-6 is fast and cost-effective for weekly reports;
-# swap to claude-opus-4-8 for deeper multi-session analysis if needed.
-MODEL = "claude-sonnet-4-6"
+MODEL = "gemini-2.0-flash"
 MAX_TOKENS = 2048
 
 
 def generate_report(as_of: str | None = None) -> str:
-    """Call the Anthropic API and return the coaching report as a markdown string."""
+    """Call Gemini and return the coaching report as a markdown string."""
     as_of = as_of or date.today().isoformat()
 
     summary = summary_as_dict(as_of)
@@ -44,20 +43,21 @@ def generate_report(as_of: str | None = None) -> str:
         "Please produce the weekly coaching report."
     )
 
-    client = anthropic.Anthropic()
-    message = client.messages.create(
-        model=MODEL,
-        max_tokens=MAX_TOKENS,
-        system=system_prompt,
-        messages=[{"role": "user", "content": user_message}],
+    genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
+    model = genai.GenerativeModel(
+        model_name=MODEL,
+        system_instruction=system_prompt,
+        generation_config=genai.GenerationConfig(max_output_tokens=MAX_TOKENS),
     )
-    return message.content[0].text
+    response = model.generate_content(user_message)
+    return response.text
 
 
 def save_report(content: str, as_of: str | None = None) -> Path:
     """Write the report to data/reports/weekly-YYYY-Www.md and return the path."""
     as_of = as_of or date.today().isoformat()
     week = date.fromisoformat(as_of).strftime("%Y-W%W")
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     path = REPORTS_DIR / f"weekly-{week}.md"
     path.write_text(content, encoding="utf-8")
     return path
