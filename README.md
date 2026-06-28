@@ -28,8 +28,8 @@ Personal running analytics platform powered by Garmin (Forerunner 170) data and 
 
 coach/mcp_server.py                 on-demand AI coaching via MCP tools
 data/
-  db/garmin.sqlite                  SQLite — relational queries
-  csv/*.csv                         text export — paste raw URL to any AI
+  db/garmin.sqlite                  SQLite — rebuilt locally from CSV on first use (not tracked in git)
+  csv/*.csv                         text export — paste raw URL to any AI; source of truth in git
   json/*.json                       text export — same
   reports/weekly-YYYY-Www.md        weekly coaching reports
 ```

@@ -6,13 +6,21 @@ primary key so sync runs are safe to re-run or overlap date ranges.
 
 Exports to data/csv/<table>.csv and data/json/<table>.json so any AI can
 read the current dataset directly from a raw GitHub URL without cloning.
+
+garmin.sqlite is NOT tracked in git; the committed CSV/JSON files are the
+source of truth. rebuild_db_from_csv() / ensure_db() rebuild the binary
+from CSV on a fresh checkout so sync and MCP consumers work without a
+pre-existing .sqlite file.
 """
 from __future__ import annotations
 
+import logging
 import sqlite3
 from pathlib import Path
 
 import pandas as pd
+
+log = logging.getLogger(__name__)
 
 _SCHEMA = Path(__file__).parent / "schema.sql"
 _DATA_DIR = Path(__file__).parents[1] / "data"
@@ -73,3 +81,35 @@ def export_all(conn: sqlite3.Connection, tables: list[str] | None = None) -> Non
     """Export all (or specified) tables to CSV + JSON."""
     for t in (tables or _ALL_TABLES):
         export_table(conn, t)
+
+
+def rebuild_db_from_csv(db_path: Path) -> None:
+    """Rebuild garmin.sqlite from the committed CSV exports.
+
+    Reads data/csv/<table>.csv for every table in _ALL_TABLES and upserts
+    the rows into a freshly schema-initialised database. Safe to call on an
+    existing DB — rows are upserted by primary key (idempotent).
+    """
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = _connect(db_path)
+    apply_schema(conn)
+    csv_dir = _DATA_DIR / "csv"
+    for table in _ALL_TABLES:
+        csv_path = csv_dir / f"{table}.csv"
+        if not csv_path.exists():
+            log.debug("rebuild_db_from_csv: %s not found, skipping", csv_path)
+            continue
+        df = pd.read_csv(csv_path, dtype=str)          # read as str; upsert handles typing
+        if df.empty:
+            continue
+        rows = df.where(pd.notna(df), None).to_dict(orient="records")
+        n = upsert(conn, table, rows)
+        log.info("rebuild_db_from_csv: %s — %d rows loaded", table, n)
+    conn.close()
+
+
+def ensure_db(db_path: Path) -> None:
+    """Ensure the SQLite database exists; rebuild from CSV if it is missing."""
+    if not db_path.exists():
+        log.info("garmin.sqlite not found — rebuilding from CSV exports")
+        rebuild_db_from_csv(db_path)

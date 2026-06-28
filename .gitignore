@@ -8,5 +8,6 @@ build/
 .venv/
 venv/
 .pytest_cache/
+data/db/*.sqlite
 *.sqlite-wal
 *.sqlite-shm

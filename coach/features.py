@@ -15,6 +15,8 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
+from garmin_sync.store import ensure_db
+
 DB_PATH = Path(__file__).parents[1] / "data" / "db" / "garmin.sqlite"
 
 # Sub-60 10K goal constants (carried over from garmin-runs project)
@@ -44,6 +46,7 @@ class CoachSummary:
 
 
 def _conn() -> sqlite3.Connection:
+    ensure_db(DB_PATH)  # rebuild from CSV if no local .sqlite exists
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn

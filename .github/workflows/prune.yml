@@ -1,0 +1,38 @@
+name: prune
+
+on:
+  schedule:
+    - cron: "0 2 * * 0"    # Sundays 02:00 UTC — 1 hour after the daily sync
+  workflow_dispatch:         # manual trigger for testing
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install pandas
+
+      - name: Prune stale data
+        run: python -m garmin_sync.prune
+
+      - name: Commit pruned exports
+        run: |
+          git config user.name "garmin-prune[bot]"
+          git config user.email "garmin-prune[bot]@users.noreply.github.com"
+          git add data/csv data/json
+          git diff --cached --quiet \
+            && echo "No rows pruned — nothing to commit" \
+            || git commit -m "Prune stale data [skip ci]"
+          git push

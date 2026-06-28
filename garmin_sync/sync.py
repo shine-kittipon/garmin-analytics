@@ -40,7 +40,7 @@ from .transform import (
     to_sleep,
     to_training,
 )
-from .store import _connect, apply_schema, export_all, upsert
+from .store import _connect, apply_schema, ensure_db, export_all, upsert
 
 logging.basicConfig(
     level=logging.INFO,
@@ -71,6 +71,8 @@ def run_sync(
 ) -> dict:
     start, end = resolve_range(days, start_arg, end_arg)
     log.info("=== Garmin Analytics Sync: %s → %s ===", start, end)
+
+    ensure_db(DB_PATH)          # rebuild from CSV if no local .sqlite exists
 
     client = get_client()
     source = GarminConnectSource(client)

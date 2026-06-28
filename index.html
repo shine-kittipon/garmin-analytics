@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Garmin Analytics</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:#0E1116; --panel:#161B22; --panel2:#1C232E; --line:#27313D;
+    --text:#E6EDF3; --dim:#8B98A6; --accent:#00E08A; --warn:#FF6B57;
+    --hr:#FFB347; --blue:#5BA4FF; --purple:#B47FFF;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,system-ui,sans-serif;
+    padding:env(safe-area-inset-top) 14px env(safe-area-inset-bottom)}
+  .wrap{max-width:920px;margin:0 auto;padding-top:18px}
+  h1{font-size:22px;font-weight:600;margin:2px 0 0}
+  .eyebrow{color:var(--dim);font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+
+  .statbar{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:14px;margin:14px 0;display:flex;flex-wrap:wrap;gap:14px}
+  .statbar .item{min-width:80px}
+  .statbar .k{color:var(--dim);font-size:10px;letter-spacing:.06em;text-transform:uppercase}
+  .statbar .v{font-size:16px;font-weight:600;margin-top:3px;font-variant-numeric:tabular-nums}
+  .statbar .v.ok{color:var(--accent)}
+  .statbar .v.warn{color:var(--warn)}
+  .statbar .v.em{color:var(--blue)}
+
+  .tabs{display:flex;gap:6px;margin:14px 0}
+  .tab{flex:1;background:transparent;color:var(--dim);border:1px solid transparent;
+    border-radius:10px;padding:9px 6px;font-size:13px;font-weight:500;cursor:pointer}
+  .tab.on{background:var(--panel2);color:var(--text);border-color:var(--line)}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:14px;margin-bottom:14px}
+  .card .lbl{color:var(--dim);font-size:11px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px}
+
+  canvas{max-height:220px}
+
+  .filter{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .filter input[type=date]{background:var(--panel2);color:var(--text);border:1px solid var(--line);
+    border-radius:8px;padding:7px;font-size:12px;color-scheme:dark}
+  .btn-sm{background:var(--panel2);color:var(--text);border:1px solid var(--line);
+    border-radius:8px;padding:7px 12px;font-size:12px;cursor:pointer}
+
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{text-align:left;padding:8px 7px;border-bottom:2px solid var(--line);
+    color:var(--dim);font-weight:500;font-size:10px;white-space:nowrap}
+  td{padding:7px;border-bottom:1px solid var(--panel2);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .green{color:var(--accent)}
+
+  .err{background:rgba(255,107,87,.12);border:1px solid var(--warn);color:var(--warn);
+    border-radius:10px;padding:14px;font-size:13px;margin:14px 0;line-height:1.6}
+  .empty{color:var(--dim);font-size:13px;padding:24px;text-align:center;line-height:1.7}
+  .foot{text-align:center;color:var(--dim);font-size:11px;margin:16px 0;font-family:monospace}
+
+  .agrid{display:flex;flex-wrap:wrap;gap:14px}
+  .agrid > div{min-width:90px}
+  .agrid .k{color:var(--dim);font-size:10px;text-transform:uppercase}
+  .agrid .v{font-size:18px;font-weight:600;margin-top:3px;font-variant-numeric:tabular-nums}
+  .agrid .v.ok{color:var(--accent)}
+  .agrid .v.warn{color:var(--warn)}
+  .agrid .v.gap{color:var(--hr)}
+
+  .chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:600px){.chart-grid{grid-template-columns:1fr}}
+
+  .badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:600}
+  .b-ok{background:rgba(0,224,138,.15);color:var(--accent)}
+  .b-mod{background:rgba(255,179,71,.15);color:var(--hr)}
+  .b-bad{background:rgba(255,107,87,.15);color:var(--warn)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Garmin Analytics</div>
+  <h1>แดชบอร์ดการวิ่ง</h1>
+
+  <div class="statbar">
+    <div class="item"><div class="k">ดึงล่าสุด</div><div class="v" id="sb-pulled">—</div></div>
+    <div class="item"><div class="k">กิจกรรมทั้งหมด</div><div class="v" id="sb-total">—</div></div>
+    <div class="item"><div class="k">ระยะรวม (วิ่ง)</div><div class="v em" id="sb-km">—</div></div>
+    <div class="item"><div class="k">10K โดยประมาณ</div><div class="v" id="sb-est">—</div></div>
+    <div class="item"><div class="k">สถานะ Sub-60</div><div class="v" id="sb-status">—</div></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab on" id="tab-overview" onclick="setTab('overview')">ภาพรวม</button>
+    <button class="tab"    id="tab-activity" onclick="setTab('activity')">กิจกรรม</button>
+    <button class="tab"    id="tab-wellness" onclick="setTab('wellness')">สุขภาพ</button>
+    <button class="tab"    id="tab-training" onclick="setTab('training')">ฝึกซ้อม</button>
+  </div>
+
+  <!-- ==================== OVERVIEW ==================== -->
+  <div id="view-overview">
+    <div class="card">
+      <div class="lbl">เป้าหมาย Sub-60 · 10K ใต้ 60 นาที (6:00/km)</div>
+      <div class="agrid">
+        <div><div class="k">10K โดยประมาณ</div><div class="v" id="a-est">—</div></div>
+        <div><div class="k">Pace เร็วสุด</div><div class="v" id="a-fast">—</div></div>
+        <div><div class="k">ครั้งที่ถึงเป้า</div><div class="v" id="a-hit">—</div></div>
+        <div><div class="k">สถานะ</div><div class="v" id="a-status">—</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="lbl">ฟื้นฟู & สุขภาพ (7 วันล่าสุด)</div>
+      <div class="agrid">
+        <div><div class="k">Sleep Score เฉลี่ย</div><div class="v" id="r-sleep">—</div></div>
+        <div><div class="k">HRV เฉลี่ย</div><div class="v" id="r-hrv">—</div></div>
+        <div><div class="k">HR ขณะพัก</div><div class="v" id="r-rhr">—</div></div>
+        <div><div class="k">Volume 7d</div><div class="v" id="r-vol">—</div></div>
+        <div><div class="k">Recovery</div><div class="v" id="r-recovery">—</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="lbl">Pace 15 วิ่งล่าสุด</div>
+      <canvas id="ovPaceChart"></canvas>
+      <div id="ovPaceEmpty" class="empty" style="display:none">
+        ยังไม่มีข้อมูลกิจกรรม<br>
+        <code style="font-size:11px">python -m garmin_sync.sync --days 90</code>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== ACTIVITY ==================== -->
+  <div id="view-activity" style="display:none">
+    <div class="card">
+      <div class="lbl">เลือกช่วงวันที่</div>
+      <div class="filter">
+        <input type="date" id="from" />
+        <span>–</span>
+        <input type="date" id="to" />
+        <button class="btn-sm" onclick="resetFilter()">ล้าง</button>
+      </div>
+    </div>
+    <div class="chart-grid">
+      <div class="card"><div class="lbl">Pace เทียบเป้า 6:00/km</div><canvas id="paceChart"></canvas></div>
+      <div class="card"><div class="lbl">Volume รายสัปดาห์ (km)</div><canvas id="volChart"></canvas></div>
+      <div class="card"><div class="lbl">HR เฉลี่ย</div><canvas id="hrChart"></canvas></div>
+      <div class="card"><div class="lbl">การกระจายโซน HR (เฉลี่ย %)</div><canvas id="zoneChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="scroll">
+        <table>
+          <thead><tr>
+            <th>วันที่</th><th>ประเภท</th><th>ชื่อ</th><th>ระยะ</th>
+            <th>เวลา</th><th>Pace</th><th>HR</th><th>Cad</th>
+            <th>VO2</th><th>TE</th><th>Cal</th>
+          </tr></thead>
+          <tbody id="actBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== WELLNESS ==================== -->
+  <div id="view-wellness" style="display:none">
+    <div class="chart-grid">
+      <div class="card"><div class="lbl">Sleep Score</div><canvas id="sleepScoreChart"></canvas></div>
+      <div class="card"><div class="lbl">เวลานอนรวม (ชม.)</div><canvas id="sleepDurChart"></canvas></div>
+      <div class="card"><div class="lbl">HRV (last night avg)</div><canvas id="hrvChart"></canvas></div>
+      <div class="card"><div class="lbl">HR ขณะพัก</div><canvas id="rhrChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="lbl">Body Battery & ความเครียด</div>
+      <canvas id="bbChart"></canvas>
+    </div>
+    <div class="card">
+      <div class="lbl">บันทึกการนอน</div>
+      <div class="scroll">
+        <table>
+          <thead><tr>
+            <th>วันที่</th><th>Score</th><th>รวม</th>
+            <th>Deep</th><th>REM</th><th>ตื่น</th><th>HR คืน</th><th>HRV</th>
+          </tr></thead>
+          <tbody id="sleepBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== TRAINING ==================== -->
+  <div id="view-training" style="display:none">
+    <div class="card">
+      <div class="lbl">สถานะการฝึก (ล่าสุด)</div>
+      <div class="agrid">
+        <div><div class="k">สถานะ</div><div class="v" id="ts-status">—</div></div>
+        <div><div class="k">VO2max</div><div class="v" id="ts-vo2">—</div></div>
+        <div><div class="k">Readiness</div><div class="v" id="ts-readiness">—</div></div>
+        <div><div class="k">Load เฉียบพลัน 7d</div><div class="v" id="ts-acute">—</div></div>
+        <div><div class="k">Load เรื้อรัง 28d</div><div class="v" id="ts-chronic">—</div></div>
+        <div><div class="k">Ratio (เป้า 0.8–1.3)</div><div class="v" id="ts-ratio">—</div></div>
+      </div>
+    </div>
+    <div class="chart-grid">
+      <div class="card"><div class="lbl">VO2max (แนวโน้ม)</div><canvas id="vo2Chart"></canvas></div>
+      <div class="card"><div class="lbl">Training Load</div><canvas id="loadChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="lbl">บันทึกการฝึก</div>
+      <div class="scroll">
+        <table>
+          <thead><tr>
+            <th>วันที่</th><th>VO2max</th><th>สถานะ</th><th>Readiness</th>
+            <th>Load เฉียบพลัน</th><th>Load เรื้อรัง</th>
+          </tr></thead>
+          <tbody id="trainBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="errbox"></div>
+  <div class="foot">sync: <code>python -m garmin_sync.sync --days 90</code> &nbsp;·&nbsp; AI: <code>python -m coach.mcp_server</code></div>
+</div>
+
+<script>
+const GOAL_PACE = 6.0;
+const MIN_KM    = 3.0;
+const GOAL_DIST = 10.0;
+const MO = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+
+let DATA  = {activities:[],sleep:[],hrv:[],daily:[],training:[],sync:[]};
+let state = {from:null,to:null};
+let CHARTS = [];
+
+// ── utils ─────────────────────────────────────────────────────────────────────
+const nz  = v => (v==null||v===""||v===undefined) ? "—" : v;
+const byDate = (a,b) => a.date.localeCompare(b.date);
+function avg(arr){ return arr.length ? arr.reduce((s,x)=>s+x,0)/arr.length : null; }
+function r1(v){ return v!=null ? Math.round(v*10)/10 : null; }
+
+function fmtPace(p){
+  if(p==null||isNaN(p)) return "—";
+  const m=Math.floor(p), s=Math.round((p-m)*60);
+  return `${m}:${String(s).padStart(2,"0")}`;
+}
+function fmtMMSS(min){
+  if(min==null||isNaN(min)) return "—";
+  const mm=Math.floor(min), ss=Math.round((min-mm)*60);
+  return `${mm}:${String(ss).padStart(2,"0")}`;
+}
+function fmtHHMM(min){
+  if(min==null) return "—";
+  return `${Math.floor(min/60)}:${String(min%60).padStart(2,"0")}`;
+}
+function thaiDate(iso){
+  if(!iso) return "—";
+  const [,m,d]=iso.split("-");
+  return `${+d} ${MO[+m-1]}`;
+}
+// Riegel: T2 = T1 * (D2/D1)^1.06
+function riegel(distKm,durMin,targetKm){
+  return durMin * Math.pow(targetKm/distKm, 1.06);
+}
+
+// ── data loading ──────────────────────────────────────────────────────────────
+async function load(){
+  const t="?t="+Date.now();
+  const files=[
+    "data/json/activities.json",
+    "data/json/sleep.json",
+    "data/json/hrv.json",
+    "data/json/daily_summary.json",
+    "data/json/training.json",
+    "data/json/sync_log.json",
+  ];
+  try{
+    const [activities,sleep,hrv,daily,training,sync] = await Promise.all(
+      files.map(f=>fetch(f+t).then(r=>r.ok?r.json():[]).catch(()=>[]))
+    );
+    DATA={activities,sleep,hrv,daily,training,sync};
+    setupFilter();
+    renderAll();
+  }catch(e){
+    document.getElementById("errbox").innerHTML=
+      `<div class="err">โหลดข้อมูลไม่ได้: ${e.message}<br>
+      ต้องรัน HTTP server: <code>python -m http.server 8000</code> จาก root ของโปรเจกต์<br>
+      แล้วซิงก์ข้อมูล: <code>python -m garmin_sync.sync --days 90</code></div>`;
+  }
+}
+
+// ── filtering ─────────────────────────────────────────────────────────────────
+function isRunning(a){
+  const t=(a.activity_type||"").toLowerCase();
+  return t.includes("run") || (t===""&&a.pace_min_km!=null);
+}
+function runActivities(){
+  return DATA.activities
+    .filter(a=>isRunning(a)&&a.distance_km>0&&a.pace_min_km)
+    .sort(byDate);
+}
+function filteredRuns(){
+  let v=runActivities();
+  if(state.from) v=v.filter(r=>r.date>=state.from);
+  if(state.to)   v=v.filter(r=>r.date<=state.to);
+  return v;
+}
+function setupFilter(){
+  const runs=runActivities();
+  const from=document.getElementById("from"),to=document.getElementById("to");
+  if(runs.length){from.min=to.min=runs[0].date; from.max=to.max=runs[runs.length-1].date;}
+  from.onchange=()=>{state.from=from.value||null; renderAll();};
+  to.onchange  =()=>{state.to  =to.value  ||null; renderAll();};
+}
+function resetFilter(){
+  state.from=state.to=null;
+  document.getElementById("from").value="";
+  document.getElementById("to").value="";
+  renderAll();
+}
+
+// ── main render ───────────────────────────────────────────────────────────────
+function renderAll(){
+  renderStatbar();
+  renderOverview();
+  renderActivity();
+  renderWellness();
+  renderTraining();
+}
+
+// ── stat bar ──────────────────────────────────────────────────────────────────
+function renderStatbar(){
+  const last=DATA.sync.length?DATA.sync[DATA.sync.length-1]:null;
+  if(last&&last.ran_at_utc){
+    const dt=new Date(last.ran_at_utc);
+    document.getElementById("sb-pulled").textContent=
+      dt.toLocaleString("th-TH",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"});
+  }
+  const runs=runActivities();
+  document.getElementById("sb-total").textContent=DATA.activities.filter(a=>a.distance_km>0).length||"0";
+  const km=runs.reduce((s,a)=>s+(a.distance_km||0),0);
+  document.getElementById("sb-km").textContent=km>0?km.toFixed(1)+" km":"0 km";
+
+  const qual=runs.filter(r=>r.distance_km>=MIN_KM);
+  if(qual.length){
+    const last=qual[qual.length-1];
+    const pred=riegel(last.distance_km,last.duration_min,GOAL_DIST);
+    document.getElementById("sb-est").textContent=fmtMMSS(pred);
+    const st=document.getElementById("sb-status");
+    if(pred<=60){st.textContent="ถึงเป้า 🎉";st.className="v ok";}
+    else{st.textContent="ห่าง "+fmtMMSS(pred-60);st.className="v warn";}
+  }
+}
+
+// ── overview ──────────────────────────────────────────────────────────────────
+function renderOverview(){
+  const real=runActivities().filter(r=>r.distance_km>=MIN_KM);
+  const fast=real.length?Math.min(...real.map(r=>r.pace_min_km)):null;
+  const hit=real.filter(r=>r.pace_min_km<=GOAL_PACE).length;
+  const mostRecent=real.slice().sort((a,b)=>b.date.localeCompare(a.date))[0];
+  const est=mostRecent?riegel(mostRecent.distance_km,mostRecent.duration_min,GOAL_DIST):null;
+
+  document.getElementById("a-est").textContent =est!=null?fmtMMSS(est):"—";
+  document.getElementById("a-fast").textContent=fast!=null?fmtPace(fast)+"/km":"—";
+  document.getElementById("a-hit").textContent =`${hit}/${real.length}`;
+  const st=document.getElementById("a-status");
+  if(est==null){st.textContent="—";st.className="v";}
+  else if(est<=60){st.textContent="ถึงเป้า 🎉";st.className="v ok";}
+  else{st.textContent="ห่าง "+fmtMMSS(est-60);st.className="v gap";}
+
+  // 7-day recovery snapshot
+  const d7s=new Date(Date.now()-7*864e5).toISOString().slice(0,10);
+  const avgSleep=avg(DATA.sleep.filter(s=>s.date>=d7s&&s.sleep_score!=null).map(s=>s.sleep_score));
+  const avgHrv  =avg(DATA.hrv.filter(h=>h.date>=d7s&&h.last_night_avg!=null).map(h=>h.last_night_avg));
+  const avgRhr  =avg(DATA.daily.filter(d=>d.date>=d7s&&d.resting_hr!=null).map(d=>d.resting_hr));
+  const vol7d   =runActivities().filter(r=>r.date>=d7s).reduce((s,r)=>s+(r.distance_km||0),0);
+
+  document.getElementById("r-sleep").textContent=avgSleep!=null?r1(avgSleep):"—";
+  document.getElementById("r-hrv").textContent  =avgHrv!=null?r1(avgHrv)+" ms":"—";
+  document.getElementById("r-rhr").textContent  =avgRhr!=null?Math.round(avgRhr)+" bpm":"—";
+  document.getElementById("r-vol").textContent  =vol7d>0?vol7d.toFixed(1)+" km":"—";
+  const recEl=document.getElementById("r-recovery");
+  if(avgHrv==null){recEl.textContent="—";recEl.className="v";}
+  else if(avgHrv>50){recEl.innerHTML=`<span class="badge b-ok">ดี</span>`;}
+  else if(avgHrv>35){recEl.innerHTML=`<span class="badge b-mod">ปานกลาง</span>`;}
+  else             {recEl.innerHTML=`<span class="badge b-bad">ต่ำ</span>`;}
+
+  // Mini pace chart – last 15 qualifying runs
+  killCharts(["ovPaceChart"]);
+  const last15=real.slice(-15);
+  const emEl=document.getElementById("ovPaceEmpty");
+  if(last15.length){
+    emEl.style.display="none";
+    mkLine("ovPaceChart",last15.map(r=>thaiDate(r.date)),[
+      {data:last15.map(r=>r.pace_min_km),borderColor:"#E6EDF3",tension:.3,pointRadius:3},
+      {data:last15.map(()=>GOAL_PACE),borderColor:"#00E08A",borderDash:[5,4],pointRadius:0}
+    ],{reverse:true,callback:v=>fmtPace(v)});
+  }else{
+    emEl.style.display="block";
+  }
+}
+
+// ── activity tab ──────────────────────────────────────────────────────────────
+function renderActivity(){
+  const v=filteredRuns();
+  killCharts(["paceChart","volChart","hrChart","zoneChart"]);
+
+  if(!v.length){
+    document.getElementById("actBody").innerHTML=
+      `<tr><td colspan="11" class="empty">ยังไม่มีข้อมูลกิจกรรมวิ่ง</td></tr>`;
+    return;
+  }
+
+  mkLine("paceChart",v.map(r=>thaiDate(r.date)),[
+    {data:v.map(r=>r.pace_min_km),borderColor:"#E6EDF3",tension:.3,pointRadius:3},
+    {data:v.map(()=>GOAL_PACE),borderColor:"#00E08A",borderDash:[5,4],pointRadius:0}
+  ],{reverse:true,callback:p=>fmtPace(p)});
+
+  const wk={};
+  v.forEach(r=>{
+    const d=new Date(r.date),oj=new Date(d.getFullYear(),0,1);
+    const w="W"+Math.ceil(((d-oj)/864e5+oj.getDay()+1)/7);
+    wk[w]=(wk[w]||0)+r.distance_km;
+  });
+  mkBar("volChart",Object.keys(wk),[
+    {data:Object.values(wk).map(x=>+x.toFixed(1)),backgroundColor:"#5BA4FF",borderRadius:3}
+  ]);
+
+  const hrD=v.filter(r=>r.avg_hr);
+  if(hrD.length) mkLine("hrChart",hrD.map(r=>thaiDate(r.date)),[
+    {data:hrD.map(r=>r.avg_hr),borderColor:"#FFB347",tension:.3,pointRadius:3}
+  ]);
+
+  const zr=v.filter(r=>r.hr_z1_pct!=null);
+  if(zr.length){
+    const avgz=[1,2,3,4,5].map(n=>{
+      const arr=zr.map(r=>r["hr_z"+n+"_pct"]).filter(x=>x!=null);
+      return arr.length?+(arr.reduce((s,x)=>s+x,0)/arr.length).toFixed(1):0;
+    });
+    CHARTS.push(new Chart(document.getElementById("zoneChart"),{
+      type:"doughnut",
+      data:{labels:["Z1","Z2","Z3","Z4","Z5"],
+        datasets:[{data:avgz,backgroundColor:["#5BA4FF","#00E08A","#FFD93D","#FF9F43","#FF6B57"]}]},
+      options:{responsive:true,plugins:{legend:{position:"right",labels:{color:"#8B98A6",font:{size:11}}}}}
+    }));
+  }
+
+  document.getElementById("actBody").innerHTML=[...v].reverse().map(r=>`<tr>
+    <td>${thaiDate(r.date)}</td>
+    <td>${nz(r.activity_type)}</td>
+    <td>${r.activity_name||"—"}</td>
+    <td>${r.distance_km} km</td>
+    <td>${fmtMMSS(r.duration_min)}</td>
+    <td class="${r.pace_min_km<=GOAL_PACE?"green":""}">${fmtPace(r.pace_min_km)}</td>
+    <td>${nz(r.avg_hr)}</td>
+    <td>${nz(r.avg_cadence)}</td>
+    <td>${nz(r.vo2max)}</td>
+    <td>${nz(r.aerobic_te)}</td>
+    <td>${nz(r.calories)}</td>
+  </tr>`).join("");
+}
+
+// ── wellness tab ──────────────────────────────────────────────────────────────
+function renderWellness(){
+  killCharts(["sleepScoreChart","sleepDurChart","hrvChart","rhrChart","bbChart"]);
+
+  const sleepD=DATA.sleep.filter(s=>s.sleep_score!=null).sort(byDate);
+  const hrvD  =DATA.hrv.filter(h=>h.last_night_avg!=null).sort(byDate);
+  const rhrD  =DATA.daily.filter(d=>d.resting_hr!=null).sort(byDate);
+  const bbD   =DATA.daily.filter(d=>d.body_battery_max!=null||d.stress_avg!=null).sort(byDate);
+
+  if(sleepD.length){
+    mkBar("sleepScoreChart",sleepD.map(s=>thaiDate(s.date)),[
+      {data:sleepD.map(s=>s.sleep_score),backgroundColor:"#B47FFF",borderRadius:3}
+    ],{min:0,max:100});
+    mkBar("sleepDurChart",sleepD.map(s=>thaiDate(s.date)),[
+      {data:sleepD.map(s=>s.total_min!=null?+(s.total_min/60).toFixed(1):null),
+        backgroundColor:"#5BA4FF",borderRadius:3}
+    ]);
+  }
+  if(hrvD.length) mkLine("hrvChart",hrvD.map(h=>thaiDate(h.date)),[
+    {data:hrvD.map(h=>h.last_night_avg),borderColor:"#00E08A",tension:.3,pointRadius:3}
+  ]);
+  if(rhrD.length) mkLine("rhrChart",rhrD.map(d=>thaiDate(d.date)),[
+    {data:rhrD.map(d=>d.resting_hr),borderColor:"#FFB347",tension:.3,pointRadius:3}
+  ]);
+  if(bbD.length){
+    const o=BASE();
+    o.plugins.legend={display:true,labels:{color:"#8B98A6",font:{size:10}}};
+    CHARTS.push(new Chart(document.getElementById("bbChart"),{type:"bar",
+      data:{labels:bbD.map(d=>thaiDate(d.date)),datasets:[
+        {label:"Stress",data:bbD.map(d=>d.stress_avg),backgroundColor:"rgba(255,107,87,.7)",borderRadius:2},
+        {label:"Body Battery",data:bbD.map(d=>d.body_battery_max),backgroundColor:"rgba(0,224,138,.7)",borderRadius:2},
+      ]},options:o}));
+  }
+
+  const allSleep=DATA.sleep.slice().sort((a,b)=>b.date.localeCompare(a.date));
+  document.getElementById("sleepBody").innerHTML=allSleep.length
+    ?allSleep.map(s=>`<tr>
+        <td>${thaiDate(s.date)}</td><td>${nz(s.sleep_score)}</td>
+        <td>${fmtHHMM(s.total_min)}</td><td>${fmtHHMM(s.deep_min)}</td>
+        <td>${fmtHHMM(s.rem_min)}</td><td>${fmtHHMM(s.awake_min)}</td>
+        <td>${nz(s.avg_overnight_hr)}</td><td>${nz(s.avg_hrv)}</td>
+      </tr>`).join("")
+    :`<tr><td colspan="8" class="empty">ยังไม่มีข้อมูลการนอน</td></tr>`;
+}
+
+// ── training tab ──────────────────────────────────────────────────────────────
+function renderTraining(){
+  killCharts(["vo2Chart","loadChart"]);
+
+  const tr=DATA.training.slice().sort(byDate);
+  const latest=tr.length?tr[tr.length-1]:null;
+  if(latest){
+    document.getElementById("ts-status").textContent   =nz(latest.training_status);
+    document.getElementById("ts-vo2").textContent      =latest.vo2max!=null?latest.vo2max+" mL/kg/min":"—";
+    document.getElementById("ts-readiness").textContent=nz(latest.training_readiness_score);
+    document.getElementById("ts-acute").textContent    =latest.acute_load!=null?r1(latest.acute_load):"—";
+    document.getElementById("ts-chronic").textContent  =latest.chronic_load!=null?r1(latest.chronic_load):"—";
+    if(latest.acute_load&&latest.chronic_load&&latest.chronic_load>0){
+      const ratio=latest.acute_load/(latest.chronic_load/4);
+      const el=document.getElementById("ts-ratio");
+      el.textContent=r1(ratio);
+      el.className="v "+(ratio>1.5||ratio<0.8?"warn":"ok");
+    }
+  }
+
+  // VO2max: prefer per-activity values (more points), fall back to training table
+  const actVo2=DATA.activities.filter(a=>a.vo2max!=null).sort(byDate);
+  const trVo2 =tr.filter(t=>t.vo2max!=null);
+  const vo2src=actVo2.length?actVo2:trVo2;
+  if(vo2src.length) mkLine("vo2Chart",vo2src.map(x=>thaiDate(x.date)),[
+    {data:vo2src.map(x=>x.vo2max),borderColor:"#00E08A",tension:.3,pointRadius:3}
+  ]);
+
+  const loadD=tr.filter(t=>t.acute_load!=null);
+  if(loadD.length){
+    const o=BASE();
+    o.plugins.legend={display:true,labels:{color:"#8B98A6",font:{size:10}}};
+    CHARTS.push(new Chart(document.getElementById("loadChart"),{type:"bar",
+      data:{labels:loadD.map(t=>thaiDate(t.date)),datasets:[
+        {label:"Acute 7d",data:loadD.map(t=>r1(t.acute_load)),backgroundColor:"rgba(91,164,255,.8)",borderRadius:2},
+        {label:"Chronic/4",data:loadD.map(t=>t.chronic_load!=null?r1(t.chronic_load/4):null),
+          backgroundColor:"rgba(255,179,71,.8)",borderRadius:2},
+      ]},options:o}));
+  }
+
+  document.getElementById("trainBody").innerHTML=tr.length
+    ?[...tr].reverse().map(t=>`<tr>
+        <td>${thaiDate(t.date)}</td><td>${nz(t.vo2max)}</td>
+        <td>${nz(t.training_status)}</td><td>${nz(t.training_readiness_score)}</td>
+        <td>${t.acute_load!=null?r1(t.acute_load):"—"}</td>
+        <td>${t.chronic_load!=null?r1(t.chronic_load):"—"}</td>
+      </tr>`).join("")
+    :`<tr><td colspan="6" class="empty">ยังไม่มีข้อมูลการฝึก</td></tr>`;
+}
+
+// ── chart helpers ─────────────────────────────────────────────────────────────
+const GR="#27313D", DM="#8B98A6";
+function BASE(){
+  return{responsive:true,plugins:{legend:{display:false}},
+    scales:{
+      x:{ticks:{color:DM,font:{size:9}},grid:{color:GR}},
+      y:{ticks:{color:DM,font:{size:9}},grid:{color:GR}}
+    }};
+}
+function mkLine(id,labels,datasets,yOpts={}){
+  const o=BASE();
+  if(yOpts.reverse) o.scales.y.reverse=true;
+  if(yOpts.callback) o.scales.y.ticks.callback=yOpts.callback;
+  if(yOpts.min!=null) o.scales.y.min=yOpts.min;
+  if(yOpts.max!=null) o.scales.y.max=yOpts.max;
+  const ch=new Chart(document.getElementById(id),{type:"line",data:{labels,datasets},options:o});
+  CHARTS.push(ch); return ch;
+}
+function mkBar(id,labels,datasets,yOpts={}){
+  const o=BASE();
+  if(yOpts.min!=null) o.scales.y.min=yOpts.min;
+  if(yOpts.max!=null) o.scales.y.max=yOpts.max;
+  const ch=new Chart(document.getElementById(id),{type:"bar",data:{labels,datasets},options:o});
+  CHARTS.push(ch); return ch;
+}
+function killCharts(ids){
+  CHARTS=CHARTS.filter(c=>{
+    if(ids&&!ids.includes(c.canvas?.id)) return true;
+    c.destroy(); return false;
+  });
+}
+
+// ── tabs ──────────────────────────────────────────────────────────────────────
+const TABS=["overview","activity","wellness","training"];
+function setTab(t){
+  TABS.forEach(id=>{
+    document.getElementById("view-"+id).style.display=t===id?"block":"none";
+    document.getElementById("tab-"+id).classList.toggle("on",t===id);
+  });
+}
+
+load();
+</script>
+</body>
+</html>

@@ -34,16 +34,12 @@ from __future__ import annotations
 
 import asyncio
 import json
-import sqlite3
-from pathlib import Path
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp import types
 
 from .features import _conn, sub60_projection, summary_as_dict
-
-DB_PATH = Path(__file__).parents[1] / "data" / "db" / "garmin.sqlite"
 
 app = Server("garmin-analytics")
 
@@ -112,8 +108,7 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
                 text=json.dumps({"error": "Only SELECT queries are allowed"}),
             )]
         try:
-            conn = sqlite3.connect(DB_PATH)
-            conn.row_factory = sqlite3.Row
+            conn = _conn()      # ensures DB is rebuilt from CSV if missing
             rows = [dict(r) for r in conn.execute(sql).fetchall()]
             conn.close()
             return [types.TextContent(
