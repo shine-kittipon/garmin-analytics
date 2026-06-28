@@ -58,6 +58,11 @@ def upsert(conn: sqlite3.Connection, table: str, rows: list[dict]) -> int:
 def export_table(conn: sqlite3.Connection, table: str) -> None:
     """Write data/csv/<table>.csv and data/json/<table>.json."""
     df = pd.read_sql_query(f"SELECT * FROM {table} ORDER BY rowid", conn)
+    # Drop rows where every non-key field is null (Garmin placeholder entries)
+    key_cols = {"date", "activity_id", "record_id", "lap_index"}
+    value_cols = [c for c in df.columns if c not in key_cols]
+    if value_cols:
+        df = df[df[value_cols].notna().any(axis=1)]
     csv_path = _DATA_DIR / "csv" / f"{table}.csv"
     json_path = _DATA_DIR / "json" / f"{table}.json"
     df.to_csv(csv_path, index=False, encoding="utf-8")

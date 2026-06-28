@@ -33,6 +33,11 @@ def _pace(dist_km: float | None, dur_min: float | None) -> float | None:
     return None
 
 
+def _has_data(row: dict) -> bool:
+    """Return True if any field besides 'date' has a non-None value."""
+    return any(v is not None for k, v in row.items() if k != "date")
+
+
 # --------------------------------------------------------------------------- #
 # HR zone percentage helper (ported from garmin_pull.py)
 # --------------------------------------------------------------------------- #
@@ -168,7 +173,7 @@ def to_sleep(raw: dict) -> dict | None:
         v = dto.get(key)
         return _int(v / 60) if v else None
 
-    return {
+    row = {
         "date": d,
         "total_min": _secs_to_min("sleepTimeSeconds"),
         "deep_min": _secs_to_min("deepSleepSeconds"),
@@ -179,6 +184,7 @@ def to_sleep(raw: dict) -> dict | None:
         "avg_overnight_hr": _r(dto.get("averageSpO2HRSleep"), 1),
         "avg_hrv": _r(dto.get("avgSleepStress"), 1),
     }
+    return row if _has_data(row) else None
 
 
 # --------------------------------------------------------------------------- #
@@ -228,7 +234,7 @@ def to_training(raw: dict) -> dict | None:
             or _r((max_metrics_data.get("generic") or {}).get("vo2MaxPreciseValue"), 1)
         )
 
-    return {
+    row = {
         "date": d,
         "vo2max": vo2max,
         "training_status": _str(
@@ -245,6 +251,7 @@ def to_training(raw: dict) -> dict | None:
             tr.get("levelDescription") or tr.get("description")
         ),
     }
+    return row if _has_data(row) else None
 
 
 # --------------------------------------------------------------------------- #
