@@ -95,19 +95,28 @@ class GarminConnectSource:
 
     def get_training_readiness(self, date: str) -> dict:
         try:
-            return self._c.get_training_readiness(date) or {}
+            result = self._c.get_training_readiness(date) or {}
+            if isinstance(result, list):
+                return result[0] if result else {}
+            return result
         except Exception:
             return {}
 
     def get_training_status(self, date: str) -> dict:
         try:
-            return self._c.get_training_status(date) or {}
+            result = self._c.get_training_status(date) or {}
+            if isinstance(result, list):
+                return result[0] if result else {}
+            return result
         except Exception:
             return {}
 
     def get_max_metrics(self, date: str) -> dict:
         try:
-            return self._c.get_max_metrics(date) or {}
+            result = self._c.get_max_metrics(date) or {}
+            if isinstance(result, list):
+                return result[0] if result else {}
+            return result
         except Exception:
             return {}
 

@@ -1,0 +1,2 @@
+id,ran_at_utc,range_start,range_end,rows_activities,rows_laps,rows_daily,rows_sleep,rows_hrv,rows_training,source
+1,2026-06-28T00:42:36+00:00,2026-06-21,2026-06-28,0,0,0,8,1,8,garminconnect
