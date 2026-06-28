@@ -1,0 +1,62 @@
+name: sync
+
+on:
+  schedule:
+    - cron: "0 1 * * *"    # 01:00 UTC daily — keeps PC off for sync
+  workflow_dispatch:
+    inputs:
+      days:
+        description: "Days to look back (default: 2 for daily, use 365 for full backfill)"
+        default: "2"
+        required: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write    # needed to git push the updated data/ files
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install garminconnect garth pandas anthropic mcp
+
+      - name: Pull Garmin data
+        env:
+          GARMIN_EMAIL: ${{ secrets.GARMIN_EMAIL }}
+          GARMIN_PASSWORD: ${{ secrets.GARMIN_PASSWORD }}
+          GARMIN_TOKEN: ${{ secrets.GARMIN_TOKEN }}
+        run: |
+          python -m garmin_sync.sync --days ${{ github.event.inputs.days || '2' }}
+
+      - name: Generate weekly coaching report (Mondays only)
+        # Only runs on the scheduled cron, not manual dispatch
+        if: github.event_name == 'schedule'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          # date +%u returns 1 for Monday
+          if [ "$(date +%u)" = "1" ]; then
+            echo "Monday — generating weekly coaching report"
+            python -m coach.report
+          else
+            echo "Not Monday — skipping weekly report"
+          fi
+
+      - name: Commit updated data
+        run: |
+          git config user.name "garmin-sync[bot]"
+          git config user.email "garmin-sync[bot]@users.noreply.github.com"
+          git add data/
+          git diff --cached --quiet \
+            && echo "No data changes to commit" \
+            || git commit -m "Update Garmin data [skip ci]"
+          git push
