@@ -4,5 +4,17 @@
     "last_night_avg":null,
     "weekly_avg":null,
     "status":"NONE"
+  },
+  {
+    "date":"2026-06-29",
+    "last_night_avg":null,
+    "weekly_avg":null,
+    "status":"NONE"
+  },
+  {
+    "date":"2026-06-30",
+    "last_night_avg":null,
+    "weekly_avg":null,
+    "status":"NONE"
   }
 ]

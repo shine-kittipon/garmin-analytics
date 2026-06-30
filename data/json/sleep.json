@@ -1,13 +1,35 @@
 [
   {
     "date":"2026-06-28",
-    "total_min":440.0,
-    "deep_min":89.0,
-    "light_min":258.0,
-    "rem_min":93.0,
-    "awake_min":24.0,
-    "sleep_score":85.0,
+    "total_min":440,
+    "deep_min":89,
+    "light_min":258,
+    "rem_min":93,
+    "awake_min":24,
+    "sleep_score":85,
     "avg_overnight_hr":null,
     "avg_hrv":12.0
+  },
+  {
+    "date":"2026-06-29",
+    "total_min":475,
+    "deep_min":95,
+    "light_min":276,
+    "rem_min":104,
+    "awake_min":8,
+    "sleep_score":90,
+    "avg_overnight_hr":null,
+    "avg_hrv":17.0
+  },
+  {
+    "date":"2026-06-30",
+    "total_min":493,
+    "deep_min":102,
+    "light_min":281,
+    "rem_min":110,
+    "awake_min":45,
+    "sleep_score":76,
+    "avg_overnight_hr":null,
+    "avg_hrv":11.0
   }
 ]
